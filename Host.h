@@ -14,10 +14,10 @@
 
 using namespace omnetpp;
 
-namespace aloha {
+namespace csma {
 
 /**
- * Aloha host; see NED file for more info.
+ * CSMA host; see NED file for more info.
  */
 class Host : public cSimpleModule, public cListener
 {
@@ -64,6 +64,7 @@ class Host : public cSimpleModule, public cListener
     cMessage *backoffTimer;
 
     cPacket *pk;
+    char pkname[40];
 
   public:
     virtual ~Host();

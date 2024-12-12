@@ -12,7 +12,7 @@
 #include "Host.h"
 #include "Server.h"
 
-namespace aloha {
+namespace csma {
 
 Define_Module(Host);
 
@@ -66,7 +66,6 @@ void Host::initialize()
     backoffCount = 0;
     backoffTimer = new cMessage("backoff");
     
-    // ���ķ��������ŵ�״̬�ź�
     channelStateSignal = registerSignal("channelState");
     server->subscribe("channelState", this);
 
@@ -82,6 +81,7 @@ void Host::handleMessage(cMessage *msg)
 
     if (msg == backoffTimer) {
         if (!channelBusy) {
+                EV << "send packet " << pkname << endl;
                 state = TRANSMIT;
                 emit(stateSignal, state);
                 
@@ -107,6 +107,7 @@ void Host::handleMessage(cMessage *msg)
                     lastPacket = pk->dup();
                 }
         } else {
+            EV << "backoff packet " << pkname << endl;
             state = BACKOFF;
             emit(stateSignal, state);
             backoffCount++;
@@ -115,18 +116,19 @@ void Host::handleMessage(cMessage *msg)
         }
     }
     else {
-        EV << "host listen other msg" << endl;
         if (state == IDLE) {
-            if (!channelBusy) {
-                // generate packet and schedule timer when it ends
-                char pkname[40];
-                snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getId(), pkCounter++);
-                EV << "generating packet " << pkname << endl;
+            // generate packet
+            snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getId(), pkCounter++);
+            EV << "generating packet " << pkname << endl;
+            pk = new cPacket(pkname);
 
+            if (!channelBusy) {
+
+                EV << "send packet " << pkname << endl;
                 state = TRANSMIT;
                 emit(stateSignal, state);
 
-                pk = new cPacket(pkname);
+                // schedule timer when it ends
                 pk->setBitLength(pkLenBits->intValue());
                 simtime_t duration = pk->getBitLength() / txRate;
                 sendDirect(pk, radioDelay, duration, server->gate("in"));
@@ -151,6 +153,7 @@ void Host::handleMessage(cMessage *msg)
                 }
             }
             else {
+                EV << "backoff packet " << pkname << endl;
                 state = BACKOFF;
                 emit(stateSignal, state);
                 backoffCount++;

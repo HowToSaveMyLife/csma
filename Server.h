@@ -14,10 +14,10 @@
 
 using namespace omnetpp;
 
-namespace aloha {
+namespace csma {
 
 /**
- * Aloha server; see NED file for more info.
+ * CSMA server; see NED file for more info.
  */
 class Server : public cSimpleModule
 {

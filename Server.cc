@@ -9,7 +9,7 @@
 
 #include "Server.h"
 
-namespace aloha {
+namespace csma {
 
 Define_Module(Server);
 

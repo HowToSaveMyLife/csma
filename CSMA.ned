@@ -12,7 +12,7 @@
 // The Aloha network consists of hosts which talk to the central "server" via
 // the Aloha or Slotted Aloha protocol
 //
-network Aloha
+network CSMA
 {
     parameters:
         int numHosts;  // number of hosts
