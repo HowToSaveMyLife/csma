@@ -30,6 +30,8 @@ class Host : public cSimpleModule, public cListener
     simtime_t slotTime;
     bool isSlotted;
 
+    simtime_t unit_backoffTime;
+
     // state variables, event pointers etc
     cModule *server;
     cMessage *endTxEvent = nullptr;

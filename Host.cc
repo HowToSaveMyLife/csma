@@ -32,6 +32,7 @@ void Host::initialize()
     pkLenBits = &par("pkLenBits");
 
     slotTime = par("slotTime");
+    unit_backoffTime = par("unit_backoffTime");
     isSlotted = slotTime > 0;
     WATCH(slotTime);
     WATCH(isSlotted);
@@ -111,7 +112,7 @@ void Host::handleMessage(cMessage *msg)
             state = BACKOFF;
             emit(stateSignal, state);
             backoffCount++;
-            backoffTime = pow(2, backoffCount) * slotTime;
+            backoffTime = pow(2, backoffCount) * unit_backoffTime;
             scheduleAt(simTime() + backoffTime, backoffTimer);
         }
     }
@@ -157,7 +158,7 @@ void Host::handleMessage(cMessage *msg)
                 state = BACKOFF;
                 emit(stateSignal, state);
                 backoffCount++;
-                backoffTime = pow(2, backoffCount) * slotTime;
+                backoffTime = pow(2, backoffCount) * unit_backoffTime;
                 scheduleAt(simTime() + backoffTime, backoffTimer);
             }
         }
