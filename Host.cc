@@ -10,6 +10,7 @@
 #include <algorithm>
 
 #include "Host.h"
+#include "Server.h"
 
 namespace aloha {
 
@@ -58,15 +59,17 @@ void Host::initialize()
     getDisplayString().setTagArg("p", 0, x);
     getDisplayString().setTagArg("p", 1, y);
 
-    // ³õÊ¼»¯CSMA²ÎÊý
+    // ï¿½ï¿½Ê¼ï¿½ï¿½CSMAï¿½ï¿½ï¿½ï¿½
     channelBusy = false;
     backoffTime = 0;
-    maxBackoffs = 16;  // ×î´óÍË±Ü´ÎÊý
+    maxBackoffs = 16;  // ï¿½ï¿½ï¿½ï¿½Ë±Ü´ï¿½ï¿½ï¿½
     backoffCount = 0;
     backoffTimer = new cMessage("backoff");
     
-    // ¶©ÔÄ·þÎñÆ÷µÄÐÅµÀ×´Ì¬ÐÅºÅ
-    server->subscribe("channelState", this, channelStateSignal);
+    // ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Åµï¿½×´Ì¬ï¿½Åºï¿½
+//    channelStateSignal = registerSignal("channelState");
+    server->subscribe("channelState", this);
+//    subscribe("channelState", this);
 
     scheduleAt(getNextTransmissionTime(), endTxEvent);
 }
@@ -79,7 +82,8 @@ void Host::handleMessage(cMessage *msg)
         getParentModule()->getCanvas()->setAnimationSpeed(transmissionEdgeAnimationSpeed, this);
 
     if (msg == backoffTimer) {
-        // ÍË±ÜÊ±¼äµ½,³¢ÊÔ·¢ËÍ
+        EV << "";
+        // ï¿½Ë±ï¿½Ê±ï¿½äµ½,ï¿½ï¿½ï¿½Ô·ï¿½ï¿½ï¿½
         if (!channelBusy) {
                 state = TRANSMIT;
                 emit(stateSignal, state);
@@ -106,7 +110,7 @@ void Host::handleMessage(cMessage *msg)
                     lastPacket = pk->dup();
                 }
         } else {
-            // ÐÅµÀÃ¦,ÍË±Ü
+            // ï¿½Åµï¿½Ã¦,ï¿½Ë±ï¿½
             state = BACKOFF;
             emit(stateSignal, state);
             backoffCount++;
@@ -150,7 +154,7 @@ void Host::handleMessage(cMessage *msg)
                 }
             }
             else {
-                // ÐÅµÀÃ¦,ÍË±Ü
+                // ï¿½Åµï¿½Ã¦,ï¿½Ë±ï¿½
                 state = BACKOFF;
                 emit(stateSignal, state);
                 backoffCount++;
@@ -304,10 +308,11 @@ void Host::refreshDisplay() const
     }
 }
 
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool busy, cObject *details)
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObject *details)
 {
+    EV << "host test success";
     if (signalID == channelStateSignal) {
-        if (busy) {
+        if (b) {
             channelBusy = true;
         } else {
             channelBusy = false;
@@ -315,5 +320,11 @@ void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool busy, cO
     }
 }
 
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details){}
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, uintval_t i, cObject *details){}
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, double d, cObject *details){}
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details){}
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details){}
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details){}
 
 }; //namespace

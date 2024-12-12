@@ -19,7 +19,7 @@ namespace aloha {
 /**
  * Aloha host; see NED file for more info.
  */
-class Host : public cSimpleModule
+class Host : public cSimpleModule, public cListener
 {
   private:
     // parameters
@@ -56,14 +56,14 @@ class Host : public cSimpleModule
     mutable cRingFigure *transmissionRing = nullptr; // shows the last packet
     mutable std::vector<cOvalFigure *> transmissionCircles; // ripples inside the packet ring
 
-    // CSMA Ïà¹Ø²ÎÊý
-    bool channelBusy;  // ÐÅµÀÊÇ·ñÃ¦
-    double backoffTime;  // ÍË±ÜÊ±¼ä
-    int maxBackoffs;     // ×î´óÍË±Ü´ÎÊý
-    int backoffCount;    // µ±Ç°ÍË±Ü´ÎÊý
-    cMessage *backoffTimer;  // ÍË±Ü¶¨Ê±Æ÷
+    // CSMA ï¿½ï¿½Ø²ï¿½ï¿½ï¿½
+    bool channelBusy;  // ï¿½Åµï¿½ï¿½Ç·ï¿½Ã¦
+    simtime_t backoffTime;  // ï¿½Ë±ï¿½Ê±ï¿½ï¿½
+    int maxBackoffs;     // ï¿½ï¿½ï¿½ï¿½Ë±Ü´ï¿½ï¿½ï¿½
+    int backoffCount;    // ï¿½ï¿½Ç°ï¿½Ë±Ü´ï¿½ï¿½ï¿½
+    cMessage *backoffTimer;  // ï¿½Ë±Ü¶ï¿½Ê±ï¿½ï¿½
 
-    // ·¢ËÍµÄ°ü
+    // ï¿½ï¿½ï¿½ÍµÄ°ï¿½
     cPacket *pk;
 
   public:
@@ -74,7 +74,13 @@ class Host : public cSimpleModule
     virtual void handleMessage(cMessage *msg) override;
     virtual void refreshDisplay() const override;
     simtime_t getNextTransmissionTime();
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, bool busy, cObject *details);
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObject *details) override;
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details) override;
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, uintval_t i, cObject *details) override;
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, double d, cObject *details) override;
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details) override;
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details) override;
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details) override;
 };
 
 }; //namespace
