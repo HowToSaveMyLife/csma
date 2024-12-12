@@ -56,14 +56,13 @@ class Host : public cSimpleModule, public cListener
     mutable cRingFigure *transmissionRing = nullptr; // shows the last packet
     mutable std::vector<cOvalFigure *> transmissionCircles; // ripples inside the packet ring
 
-    // CSMA ��ز���
-    bool channelBusy;  // �ŵ��Ƿ�æ
-    simtime_t backoffTime;  // �˱�ʱ��
-    int maxBackoffs;     // ����˱ܴ���
-    int backoffCount;    // ��ǰ�˱ܴ���
-    cMessage *backoffTimer;  // �˱ܶ�ʱ��
 
-    // ���͵İ�
+    bool channelBusy;
+    simtime_t backoffTime;
+    int maxBackoffs;
+    int backoffCount;
+    cMessage *backoffTimer;
+
     cPacket *pk;
 
   public:

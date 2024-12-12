@@ -59,17 +59,16 @@ void Host::initialize()
     getDisplayString().setTagArg("p", 0, x);
     getDisplayString().setTagArg("p", 1, y);
 
-    // ï¿½ï¿½Ê¼ï¿½ï¿½CSMAï¿½ï¿½ï¿½ï¿½
+
     channelBusy = false;
     backoffTime = 0;
-    maxBackoffs = 16;  // ï¿½ï¿½ï¿½ï¿½Ë±Ü´ï¿½ï¿½ï¿½
+    maxBackoffs = 16;
     backoffCount = 0;
     backoffTimer = new cMessage("backoff");
     
     // ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Åµï¿½×´Ì¬ï¿½Åºï¿½
-//    channelStateSignal = registerSignal("channelState");
+    channelStateSignal = registerSignal("channelState");
     server->subscribe("channelState", this);
-//    subscribe("channelState", this);
 
     scheduleAt(getNextTransmissionTime(), endTxEvent);
 }
@@ -310,7 +309,7 @@ void Host::refreshDisplay() const
 
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObject *details)
 {
-    EV << "host test success";
+    EV << "host listen bool";
     if (signalID == channelStateSignal) {
         if (b) {
             channelBusy = true;
@@ -320,7 +319,17 @@ void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObje
     }
 }
 
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details){}
+void Host::receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details)
+{
+    EV << "host listen long";
+    if (signalID == channelStateSignal) {
+        // ¸ù¾ÝServer·¢ËÍµÄ×´Ì¬Öµ¸üÐÂchannelBusy
+        // Í¨³£ IDLE=0, TRANSMISSION=1, COLLISION=2
+        channelBusy = (i != 0); // ·Ç0±íÊ¾ÐÅµÀÃ¦
+        EV << "Channel state changed to: " << (channelBusy ? "busy" : "idle") << endl;
+    }
+}
+
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, uintval_t i, cObject *details){}
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, double d, cObject *details){}
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details){}
