@@ -75,14 +75,12 @@ void Host::initialize()
 
 void Host::handleMessage(cMessage *msg)
 {
-    // ASSERT(msg == endTxEvent || msg == backoffTimer);
+     ASSERT(msg == endTxEvent || msg == backoffTimer);
 
     if (hasGUI())
         getParentModule()->getCanvas()->setAnimationSpeed(transmissionEdgeAnimationSpeed, this);
 
     if (msg == backoffTimer) {
-        EV << "";
-        // ï¿½Ë±ï¿½Ê±ï¿½äµ½,ï¿½ï¿½ï¿½Ô·ï¿½ï¿½ï¿½
         if (!channelBusy) {
                 state = TRANSMIT;
                 emit(stateSignal, state);
@@ -109,7 +107,6 @@ void Host::handleMessage(cMessage *msg)
                     lastPacket = pk->dup();
                 }
         } else {
-            // ï¿½Åµï¿½Ã¦,ï¿½Ë±ï¿½
             state = BACKOFF;
             emit(stateSignal, state);
             backoffCount++;
@@ -118,6 +115,7 @@ void Host::handleMessage(cMessage *msg)
         }
     }
     else {
+        EV << "host listen other msg" << endl;
         if (state == IDLE) {
             if (!channelBusy) {
                 // generate packet and schedule timer when it ends
@@ -153,7 +151,6 @@ void Host::handleMessage(cMessage *msg)
                 }
             }
             else {
-                // ï¿½Åµï¿½Ã¦,ï¿½Ë±ï¿½
                 state = BACKOFF;
                 emit(stateSignal, state);
                 backoffCount++;
@@ -309,24 +306,17 @@ void Host::refreshDisplay() const
 
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObject *details)
 {
-    EV << "host listen bool";
-    if (signalID == channelStateSignal) {
-        if (b) {
-            channelBusy = true;
-        } else {
-            channelBusy = false;
-        }
-    }
 }
 
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details)
 {
-    EV << "host listen long";
+//    EV << "host listen long" << endl;
     if (signalID == channelStateSignal) {
-        // ¸ù¾ÝServer·¢ËÍµÄ×´Ì¬Öµ¸üÐÂchannelBusy
-        // Í¨³£ IDLE=0, TRANSMISSION=1, COLLISION=2
-        channelBusy = (i != 0); // ·Ç0±íÊ¾ÐÅµÀÃ¦
-        EV << "Channel state changed to: " << (channelBusy ? "busy" : "idle") << endl;
+        if (i > 0) {
+            channelBusy = true;
+        } else {
+            channelBusy = false;
+        }
     }
 }
 
