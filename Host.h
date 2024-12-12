@@ -33,8 +33,9 @@ class Host : public cSimpleModule
     // state variables, event pointers etc
     cModule *server;
     cMessage *endTxEvent = nullptr;
-    enum { IDLE = 0, TRANSMIT = 1 } state;
+    enum { IDLE = 0, TRANSMIT = 1, BACKOFF = 2 } state;
     simsignal_t stateSignal;
+    simsignal_t channelStateSignal;
     int pkCounter;
 
     // position on the canvas, unit is m
@@ -55,6 +56,16 @@ class Host : public cSimpleModule
     mutable cRingFigure *transmissionRing = nullptr; // shows the last packet
     mutable std::vector<cOvalFigure *> transmissionCircles; // ripples inside the packet ring
 
+    // CSMA 相关参数
+    bool channelBusy;  // 信道是否忙
+    double backoffTime;  // 退避时间
+    int maxBackoffs;     // 最大退避次数
+    int backoffCount;    // 当前退避次数
+    cMessage *backoffTimer;  // 退避定时器
+
+    // 发送的包
+    cPacket *pk;
+
   public:
     virtual ~Host();
 
@@ -63,6 +74,7 @@ class Host : public cSimpleModule
     virtual void handleMessage(cMessage *msg) override;
     virtual void refreshDisplay() const override;
     simtime_t getNextTransmissionTime();
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, bool busy, cObject *details);
 };
 
 }; //namespace
