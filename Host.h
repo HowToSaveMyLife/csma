@@ -68,6 +68,11 @@ class Host : public cSimpleModule, public cListener
     cPacket *pk;
     char pkname[40];
 
+    int numOtherHosts;
+    cModule *otherHosts[];
+    cGate *otherHostGate[];
+    double otherHostDelay[];
+
   public:
     virtual ~Host();
 

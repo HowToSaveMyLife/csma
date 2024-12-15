@@ -70,6 +70,26 @@ void Host::initialize()
     channelStateSignal = registerSignal("channelState");
     server->subscribe("channelState", this);
 
+    numOtherHosts = getVectorSize() - 1;
+    otherHostGate = new cGate *[numOtherHosts];
+    otherHosts = new cModule *[numOtherHosts];
+    int index = 0;
+    for (int i = 0; i < numOtherHosts + 1; i++) {
+        if (i == getIndex()) {
+            continue;
+        }
+        otherHosts[index] = getModuleByPath("host[%d]", i);
+        otherHostGate[index] = otherHosts[index]->gate("in");
+
+
+        double dist = std::sqrt((x-otherHosts[index]->par("x").doubleValue()) * \
+                (x-otherHosts[index]->par("x").doubleValue()) + \
+                (y-otherHosts[index]->par("y").doubleValue()) * \
+                (y-otherHosts[index]->par("y").doubleValue()));
+        otherHostDelay[index] = dist / propagationSpeed;
+        index++;
+    }
+
     scheduleAt(getNextTransmissionTime(), endTxEvent);
 }
 
@@ -122,15 +142,14 @@ void Host::handleMessage(cMessage *msg)
             snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getId(), pkCounter++);
             EV << "generating packet " << pkname << endl;
             pk = new cPacket(pkname);
+            pk->setBitLength(pkLenBits->intValue());
 
             if (!channelBusy) {
-
                 EV << "send packet " << pkname << endl;
                 state = TRANSMIT;
                 emit(stateSignal, state);
 
                 // schedule timer when it ends
-                pk->setBitLength(pkLenBits->intValue());
                 simtime_t duration = pk->getBitLength() / txRate;
                 sendDirect(pk, radioDelay, duration, server->gate("in"));
 
@@ -329,5 +348,37 @@ void Host::receiveSignal(cComponent *source, simsignal_t signalID, double d, cOb
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details){}
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details){}
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details){}
+
+void Host::sendPacket(cPacket *pk) {
+    // EV << "send packet " << pkname << endl;
+    // state = TRANSMIT;
+    // emit(stateSignal, state);
+    
+    // simtime_t duration = pk->getBitLength() / txRate;
+    // sendDirect(pk, radioDelay, duration, server->gate("in"));
+
+    // for (int i = 0; i < numOtherHosts; i++) {
+    //     sendDirect(pk, otherHostDelay[i], pk->getBitLength() / txRate, otherHostGate[i]);
+    // }
+
+    // scheduleAt(simTime()+duration, endTxEvent);
+
+    // backoffCount = 0;
+    // backoffTime = 0;
+
+    // // let visualization code know about the new packet
+    // if (transmissionRing != nullptr) {
+    //     delete lastPacket;
+    //     transmissionRing->setVisible(false);
+    //     transmissionRing->setAssociatedObject(nullptr);
+
+    //     for (auto c : transmissionCircles) {
+    //         c->setVisible(false);
+    //         c->setAssociatedObject(nullptr);
+    //     }
+
+    //     lastPacket = pk->dup();
+    // }
+}
 
 }; //namespace

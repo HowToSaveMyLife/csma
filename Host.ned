@@ -28,5 +28,7 @@ simple Host
         double midTransmissionAnimationSpeed; // used during transmission
         bool controlAnimationSpeed = default(true);
         @display("i=device/pc_s");
+    gates:
+        input in @directIn;
 }
 
