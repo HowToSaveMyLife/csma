@@ -88,6 +88,7 @@ class Host : public cSimpleModule, public cListener
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details) override;
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details) override;
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details) override;
+    void sendPacket(cPacket *pk);
 };
 
 }; //namespace
