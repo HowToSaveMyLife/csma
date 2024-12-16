@@ -69,9 +69,10 @@ class Host : public cSimpleModule, public cListener
     char pkname[40];
 
     int numOtherHosts;
-    cModule *otherHosts[];
-    cGate *otherHostGate[];
-    double otherHostDelay[];
+    cModule **otherHosts;
+    cGate **otherHostGate;
+    simtime_t *otherHostDelay;
+    char broadcast[40];
     
     cMessage *endListen = nullptr;
 
@@ -91,6 +92,7 @@ class Host : public cSimpleModule, public cListener
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details) override;
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details) override;
     void sendPacket(cPacket *pk);
+    virtual void finish() override;
 };
 
 }; //namespace

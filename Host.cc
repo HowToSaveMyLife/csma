@@ -73,21 +73,22 @@ void Host::initialize()
     numOtherHosts = getVectorSize() - 1;
     otherHostGate = new cGate *[numOtherHosts];
     otherHosts = new cModule *[numOtherHosts];
+    otherHostDelay = new simtime_t [numOtherHosts];
+    char hostname[10] = "host[x]";
     int index = 0;
     for (int i = 0; i < numOtherHosts + 1; i++) {
-        if (i == getIndex()) {
-            continue;
+        if (i != getIndex()) {
+            snprintf(hostname, sizeof(hostname), "host[%d]", i);
+            otherHosts[index] = getModuleByPath(hostname);
+            otherHostGate[index] = otherHosts[index]->gate("in");
+
+            double dist = std::sqrt((x-otherHosts[index]->par("x").doubleValue()) * \
+                    (x-otherHosts[index]->par("x").doubleValue()) + \
+                    (y-otherHosts[index]->par("y").doubleValue()) * \
+                    (y-otherHosts[index]->par("y").doubleValue()));
+            otherHostDelay[index] = dist / propagationSpeed;
+            index++;
         }
-        otherHosts[index] = getModuleByPath("host[%d]", i);
-        otherHostGate[index] = otherHosts[index]->gate("in");
-
-
-        double dist = std::sqrt((x-otherHosts[index]->par("x").doubleValue()) * \
-                (x-otherHosts[index]->par("x").doubleValue()) + \
-                (y-otherHosts[index]->par("y").doubleValue()) * \
-                (y-otherHosts[index]->par("y").doubleValue()));
-        otherHostDelay[index] = dist / propagationSpeed;
-        index++;
     }
 
     endListen = new cMessage("endListen");
@@ -122,6 +123,7 @@ void Host::handleMessage(cMessage *msg)
             pk->setBitLength(pkLenBits->intValue());
 
             if (!channelBusy) {
+                EV << "send package" << getIndex() << endl;
                 sendPacket(pk);
             } else {
                 EV << "backoff packet " << pkname << endl;
@@ -184,12 +186,28 @@ void Host::sendPacket(cPacket *pk) {
     emit(stateSignal, state);
     
     simtime_t duration = pk->getBitLength() / txRate;
+    EV << "radionDelay: " << radioDelay << endl;
+    EV << "duration: " << duration << endl;
     sendDirect(pk, radioDelay, duration, server->gate("in"));
 
     for (int i = 0; i < numOtherHosts; i++) {
-        sendDirect(pk, otherHostDelay[i], pk->getBitLength() / txRate, otherHostGate[i]);
+        snprintf(broadcast, sizeof(broadcast), "pk-%d-#%d", getId(), 0);
+        EV << "generating packet " << broadcast << endl;
+
+        cPacket *broadcastPacket = new cPacket(broadcast);
+        broadcastPacket->setBitLength(pkLenBits->intValue());
+//        broadcastPacket->
+
+        duration = broadcastPacket->getBitLength() / txRate;
+
+        EV << "radionDelay: " << otherHostDelay[i] << endl;
+        EV << "duration: " << duration << endl;
+        sendDirect(broadcastPacket, SendOptions().propagationDelay(otherHostDelay[i]).duration(duration), otherHostGate[i]);
+//        sendDirect(broadcastPacket, otherHostDelay[i], \
+//                    duration, otherHostGate[i]);
     }
 
+    duration = pk->getBitLength() / txRate;
     scheduleAt(simTime()+duration, endTxEvent);
 
     backoffCount = 0;
