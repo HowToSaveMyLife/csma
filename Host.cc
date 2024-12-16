@@ -63,7 +63,7 @@ void Host::initialize()
     getDisplayString().setTagArg("p", 1, y);
 
 
-    channelBusy = false;
+    channelBusy = 0;
     backoffTime = 0;
     maxBackoffs = 16;
     backoffCount = 0;
@@ -106,7 +106,7 @@ void Host::handleMessage(cMessage *msg)
         getParentModule()->getCanvas()->setAnimationSpeed(transmissionEdgeAnimationSpeed, this);
 
     if (msg == backoffTimer) {
-        if (!channelBusy) {
+        if (channelBusy == 0) {
             sendPacket(pk);
         } else {
             EV << "backoff packet " << pkname << endl;
@@ -124,7 +124,7 @@ void Host::handleMessage(cMessage *msg)
             pk = new cPacket(pkname);
             pk->setBitLength(pkLenBits->intValue());
 
-            if (!channelBusy) {
+            if (channelBusy == 0) {
                 sendPacket(pk);
             } else {
                 EV << "backoff packet " << pkname << endl;
@@ -141,31 +141,37 @@ void Host::handleMessage(cMessage *msg)
 
             // schedule next sending
             scheduleAt(getNextTransmissionTime(), endTxEvent);
+
+            // send to other hosts the finish signal
+            for (int i = 0; i < numOtherHosts; i++) {
+                sendDirect(endListen, otherHostDelay[i], 0, otherHostGate[i]);
+            }
         } else {
             throw cRuntimeError("invalid state");
         }
     } else if (msg == endListen) {
         EV << "finish receive other host\n";
-        channelBusy = false;
+        channelBusy--;
     } else {
         cPacket *pkt = check_and_cast<cPacket *>(msg);
 
         ASSERT(pkt->isReceptionStart());
-        simtime_t endReceptionTime = simTime() + pkt->getDuration();
+        // simtime_t endReceptionTime = simTime() + pkt->getDuration();
 
-        if (!channelBusy) {
-            // EV << "start receive other host\n";
-            channelBusy = true;
-            scheduleAt(endReceptionTime, endListen);
-        } else {
-            // EV << "another frame arrived while listening!\n";
+        // if (!channelBusy) {
+        //     // EV << "start receive other host\n";
+        //     channelBusy = true;
+        //     scheduleAt(endReceptionTime, endListen);
+        // } else {
+        //     // EV << "another frame arrived while listening!\n";
 
-            if (endReceptionTime > endListen->getArrivalTime()) {
-                cancelEvent(endListen);
-                scheduleAt(endReceptionTime, endListen);
-            }
-        }
-        channelBusy = true;
+        //     if (endReceptionTime > endListen->getArrivalTime()) {
+        //         cancelEvent(endListen);
+        //         scheduleAt(endReceptionTime, endListen);
+        //     }
+        // }
+        // channelBusy = true;
+        channelBusy++;
         delete pkt;
     }
 }

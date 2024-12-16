@@ -59,7 +59,7 @@ class Host : public cSimpleModule, public cListener
     mutable std::vector<cOvalFigure *> transmissionCircles; // ripples inside the packet ring
 
 
-    bool channelBusy;
+    int channelBusy;
     simtime_t backoffTime;
     int maxBackoffs;
     int backoffCount;
