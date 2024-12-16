@@ -125,7 +125,6 @@ void Host::handleMessage(cMessage *msg)
             pk->setBitLength(pkLenBits->intValue());
 
             if (!channelBusy) {
-                EV << "send package" << getIndex() << endl;
                 sendPacket(pk);
             } else {
                 EV << "backoff packet " << pkname << endl;
@@ -155,11 +154,11 @@ void Host::handleMessage(cMessage *msg)
         simtime_t endReceptionTime = simTime() + pkt->getDuration();
 
         if (!channelBusy) {
-            EV << "start receive other host\n";
+            // EV << "start receive other host\n";
             channelBusy = true;
             scheduleAt(endReceptionTime, endListen);
         } else {
-            EV << "another frame arrived while listening!\n";
+            // EV << "another frame arrived while listening!\n";
 
             if (endReceptionTime > endListen->getArrivalTime()) {
                 cancelEvent(endListen);
@@ -192,7 +191,7 @@ void Host::sendPacket(cPacket *pk) {
 
     for (int i = 0; i < numOtherHosts; i++) {
         snprintf(broadcast, sizeof(broadcast), "from-%d, to-%d", getIndex(), otherHosts[i]->getIndex());
-        EV << "generating packet " << broadcast << endl;
+        // EV << "generating packet " << broadcast << endl;
 
         cPacket *broadcastPacket = new cPacket(broadcast);
         broadcastPacket->setBitLength(pkLenBits->intValue());
@@ -342,13 +341,9 @@ void Host::refreshDisplay() const
     }
 }
 
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObject *details)
-{
-}
-
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details)
 {
-//    EV << "host listen long" << endl;
+    // EV << "host listen long" << endl;
     // if (signalID == channelStateSignal) {
     //     if (i > 0) {
     //         channelBusy = true;
@@ -357,11 +352,5 @@ void Host::receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, c
     //     }
     // }
 }
-
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, uintval_t i, cObject *details){}
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, double d, cObject *details){}
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details){}
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details){}
-void Host::receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details){}
 
 }; //namespace

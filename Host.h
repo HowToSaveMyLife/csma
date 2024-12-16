@@ -84,15 +84,8 @@ class Host : public cSimpleModule, public cListener
     virtual void handleMessage(cMessage *msg) override;
     virtual void refreshDisplay() const override;
     simtime_t getNextTransmissionTime();
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObject *details) override;
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details) override;
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, uintval_t i, cObject *details) override;
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, double d, cObject *details) override;
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details) override;
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details) override;
-    virtual void receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details) override;
     void sendPacket(cPacket *pk);
-    virtual void finish() override;
+    virtual void receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details) override;
 };
 
 }; //namespace
