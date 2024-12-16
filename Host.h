@@ -63,7 +63,7 @@ class Host : public cSimpleModule, public cListener
     simtime_t backoffTime;
     int maxBackoffs;
     int backoffCount;
-    cMessage *backoffTimer;
+    cMessage *backoffTimer = nullptr;
 
     cPacket *pk;
     char pkname[40];
@@ -72,6 +72,8 @@ class Host : public cSimpleModule, public cListener
     cModule *otherHosts[];
     cGate *otherHostGate[];
     double otherHostDelay[];
+    
+    cMessage *endListen = nullptr;
 
   public:
     virtual ~Host();

@@ -90,43 +90,21 @@ void Host::initialize()
         index++;
     }
 
+    endListen = new cMessage("endListen");
+
     scheduleAt(getNextTransmissionTime(), endTxEvent);
 }
 
 void Host::handleMessage(cMessage *msg)
 {
-     ASSERT(msg == endTxEvent || msg == backoffTimer);
+    //  ASSERT(msg == endTxEvent || msg == backoffTimer || endListen);
 
     if (hasGUI())
         getParentModule()->getCanvas()->setAnimationSpeed(transmissionEdgeAnimationSpeed, this);
 
     if (msg == backoffTimer) {
         if (!channelBusy) {
-                EV << "send packet " << pkname << endl;
-                state = TRANSMIT;
-                emit(stateSignal, state);
-                
-                simtime_t duration = pk->getBitLength() / txRate;
-                sendDirect(pk, radioDelay, duration, server->gate("in"));
-
-                scheduleAt(simTime()+duration, endTxEvent);
-
-                backoffCount = 0;
-                backoffTime = 0;
-
-                // let visualization code know about the new packet
-                if (transmissionRing != nullptr) {
-                    delete lastPacket;
-                    transmissionRing->setVisible(false);
-                    transmissionRing->setAssociatedObject(nullptr);
-
-                    for (auto c : transmissionCircles) {
-                        c->setVisible(false);
-                        c->setAssociatedObject(nullptr);
-                    }
-
-                    lastPacket = pk->dup();
-                }
+            sendPacket(pk);
         } else {
             EV << "backoff packet " << pkname << endl;
             state = BACKOFF;
@@ -135,8 +113,7 @@ void Host::handleMessage(cMessage *msg)
             backoffTime = pow(2, backoffCount) * unit_backoffTime;
             scheduleAt(simTime() + backoffTime, backoffTimer);
         }
-    }
-    else {
+    } else if (msg == endTxEvent) {
         if (state == IDLE) {
             // generate packet
             snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getId(), pkCounter++);
@@ -145,34 +122,8 @@ void Host::handleMessage(cMessage *msg)
             pk->setBitLength(pkLenBits->intValue());
 
             if (!channelBusy) {
-                EV << "send packet " << pkname << endl;
-                state = TRANSMIT;
-                emit(stateSignal, state);
-
-                // schedule timer when it ends
-                simtime_t duration = pk->getBitLength() / txRate;
-                sendDirect(pk, radioDelay, duration, server->gate("in"));
-
-                scheduleAt(simTime()+duration, endTxEvent);
-
-                backoffCount = 0;
-                backoffTime = 0;
-
-                // let visualization code know about the new packet
-                if (transmissionRing != nullptr) {
-                    delete lastPacket;
-                    transmissionRing->setVisible(false);
-                    transmissionRing->setAssociatedObject(nullptr);
-
-                    for (auto c : transmissionCircles) {
-                        c->setVisible(false);
-                        c->setAssociatedObject(nullptr);
-                    }
-
-                    lastPacket = pk->dup();
-                }
-            }
-            else {
+                sendPacket(pk);
+            } else {
                 EV << "backoff packet " << pkname << endl;
                 state = BACKOFF;
                 emit(stateSignal, state);
@@ -180,18 +131,39 @@ void Host::handleMessage(cMessage *msg)
                 backoffTime = pow(2, backoffCount) * unit_backoffTime;
                 scheduleAt(simTime() + backoffTime, backoffTimer);
             }
-        }
-        else if (state == TRANSMIT) {
+        } else if (state == TRANSMIT) {
             // endTxEvent indicates end of transmission
             state = IDLE;
             emit(stateSignal, state);
 
             // schedule next sending
             scheduleAt(getNextTransmissionTime(), endTxEvent);
-        }
-        else {
+        } else {
             throw cRuntimeError("invalid state");
         }
+    } else if (msg == endListen) {
+        EV << "finish receive other host\n";
+        channelBusy = false;
+    } else {
+        cPacket *pkt = check_and_cast<cPacket *>(msg);
+
+        ASSERT(pkt->isReceptionStart());
+        simtime_t endReceptionTime = simTime() + pkt->getDuration();
+
+        if (!channelBusy) {
+            EV << "start receive other host\n";
+            channelBusy = true;
+            scheduleAt(endReceptionTime, endListen);
+        } else {
+            EV << "another frame arrived while listening!\n";
+
+            if (endReceptionTime > endListen->getArrivalTime()) {
+                cancelEvent(endListen);
+                scheduleAt(endReceptionTime, endListen);
+            }
+        }
+        channelBusy = true;
+        delete pkt;
     }
 }
 
@@ -204,6 +176,38 @@ simtime_t Host::getNextTransmissionTime()
     else
         // align time of next transmission to a slot boundary
         return slotTime * ceil(t/slotTime);
+}
+
+void Host::sendPacket(cPacket *pk) {
+    EV << "send packet " << pkname << endl;
+    state = TRANSMIT;
+    emit(stateSignal, state);
+    
+    simtime_t duration = pk->getBitLength() / txRate;
+    sendDirect(pk, radioDelay, duration, server->gate("in"));
+
+    for (int i = 0; i < numOtherHosts; i++) {
+        sendDirect(pk, otherHostDelay[i], pk->getBitLength() / txRate, otherHostGate[i]);
+    }
+
+    scheduleAt(simTime()+duration, endTxEvent);
+
+    backoffCount = 0;
+    backoffTime = 0;
+
+    // let visualization code know about the new packet
+    if (transmissionRing != nullptr) {
+        delete lastPacket;
+        transmissionRing->setVisible(false);
+        transmissionRing->setAssociatedObject(nullptr);
+
+        for (auto c : transmissionCircles) {
+            c->setVisible(false);
+            c->setAssociatedObject(nullptr);
+        }
+
+        lastPacket = pk->dup();
+    }
 }
 
 void Host::refreshDisplay() const
@@ -334,13 +338,13 @@ void Host::receiveSignal(cComponent *source, simsignal_t signalID, bool b, cObje
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details)
 {
 //    EV << "host listen long" << endl;
-    if (signalID == channelStateSignal) {
-        if (i > 0) {
-            channelBusy = true;
-        } else {
-            channelBusy = false;
-        }
-    }
+    // if (signalID == channelStateSignal) {
+    //     if (i > 0) {
+    //         channelBusy = true;
+    //     } else {
+    //         channelBusy = false;
+    //     }
+    // }
 }
 
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, uintval_t i, cObject *details){}
@@ -348,37 +352,5 @@ void Host::receiveSignal(cComponent *source, simsignal_t signalID, double d, cOb
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, const SimTime &t, cObject *details){}
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, const char *s, cObject *details){}
 void Host::receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details){}
-
-void Host::sendPacket(cPacket *pk) {
-    // EV << "send packet " << pkname << endl;
-    // state = TRANSMIT;
-    // emit(stateSignal, state);
-    
-    // simtime_t duration = pk->getBitLength() / txRate;
-    // sendDirect(pk, radioDelay, duration, server->gate("in"));
-
-    // for (int i = 0; i < numOtherHosts; i++) {
-    //     sendDirect(pk, otherHostDelay[i], pk->getBitLength() / txRate, otherHostGate[i]);
-    // }
-
-    // scheduleAt(simTime()+duration, endTxEvent);
-
-    // backoffCount = 0;
-    // backoffTime = 0;
-
-    // // let visualization code know about the new packet
-    // if (transmissionRing != nullptr) {
-    //     delete lastPacket;
-    //     transmissionRing->setVisible(false);
-    //     transmissionRing->setAssociatedObject(nullptr);
-
-    //     for (auto c : transmissionCircles) {
-    //         c->setVisible(false);
-    //         c->setAssociatedObject(nullptr);
-    //     }
-
-    //     lastPacket = pk->dup();
-    // }
-}
 
 }; //namespace
