@@ -24,6 +24,8 @@ Host::~Host()
 
 void Host::initialize()
 {
+    gate("in")->setDeliverImmediately(true);
+
     stateSignal = registerSignal("state");
     server = getModuleByPath("server");
 
@@ -117,7 +119,7 @@ void Host::handleMessage(cMessage *msg)
     } else if (msg == endTxEvent) {
         if (state == IDLE) {
             // generate packet
-            snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getId(), pkCounter++);
+            snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getIndex(), pkCounter++);
             EV << "generating packet " << pkname << endl;
             pk = new cPacket(pkname);
             pk->setBitLength(pkLenBits->intValue());
@@ -186,30 +188,21 @@ void Host::sendPacket(cPacket *pk) {
     emit(stateSignal, state);
     
     simtime_t duration = pk->getBitLength() / txRate;
-    EV << "radionDelay: " << radioDelay << endl;
-    EV << "duration: " << duration << endl;
     sendDirect(pk, radioDelay, duration, server->gate("in"));
 
     for (int i = 0; i < numOtherHosts; i++) {
-        snprintf(broadcast, sizeof(broadcast), "pk-%d-#%d", getId(), 0);
+        snprintf(broadcast, sizeof(broadcast), "from-%d, to-%d", getIndex(), otherHosts[i]->getIndex());
         EV << "generating packet " << broadcast << endl;
 
         cPacket *broadcastPacket = new cPacket(broadcast);
         broadcastPacket->setBitLength(pkLenBits->intValue());
-//        broadcastPacket->
 
-        duration = broadcastPacket->getBitLength() / txRate;
-
-        EV << "radionDelay: " << otherHostDelay[i] << endl;
-        EV << "duration: " << duration << endl;
-        sendDirect(broadcastPacket, SendOptions().propagationDelay(otherHostDelay[i]).duration(duration), otherHostGate[i]);
-//        sendDirect(broadcastPacket, otherHostDelay[i], \
-//                    duration, otherHostGate[i]);
+        sendDirect(broadcastPacket, otherHostDelay[i], \
+                    broadcastPacket->getBitLength() / txRate, otherHostGate[i]);
     }
 
-    duration = pk->getBitLength() / txRate;
     scheduleAt(simTime()+duration, endTxEvent);
-
+    
     backoffCount = 0;
     backoffTime = 0;
 
