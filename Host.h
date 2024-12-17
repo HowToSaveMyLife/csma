@@ -28,14 +28,11 @@ class Host : public cSimpleModule, public cListener
     cPar *iaTime;
     cPar *pkLenBits;
     simtime_t slotTime;
-    bool isSlotted;
-
-    simtime_t unit_backoffTime;
 
     // state variables, event pointers etc
     cModule *server;
     cMessage *endTxEvent = nullptr;
-    enum { IDLE = 0, TRANSMIT = 1, BACKOFF = 2 } state;
+    enum { IDLE = 0, TRANSMIT = 1, FREEZE = 2, BEFORESNED = 3} state;
     simsignal_t stateSignal;
     simsignal_t channelStateSignal;
     int pkCounter;
@@ -59,11 +56,17 @@ class Host : public cSimpleModule, public cListener
     mutable std::vector<cOvalFigure *> transmissionCircles; // ripples inside the packet ring
 
 
+    cMessage *DIFSEvent = nullptr;
+
     int channelBusy;
     simtime_t backoffTime;
     int maxBackoffs;
     int backoffCount;
-    cMessage *backoffTimer = nullptr;
+    cMessage *backoff = nullptr;
+
+    // simtime_t SIFS;
+    simtime_t DIFS;
+    simtime_t DIFS_FLAG;
 
     cPacket *pk;
     char pkname[40];
@@ -84,6 +87,7 @@ class Host : public cSimpleModule, public cListener
     virtual void initialize() override;
     virtual void handleMessage(cMessage *msg) override;
     virtual void refreshDisplay() const override;
+    simtime_t generateBackofftime();
     simtime_t getNextTransmissionTime();
     void sendPacket(cPacket *pk);
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details) override;

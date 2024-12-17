@@ -34,10 +34,7 @@ void Host::initialize()
     pkLenBits = &par("pkLenBits");
 
     slotTime = par("slotTime");
-    unit_backoffTime = par("unit_backoffTime");
-    isSlotted = slotTime > 0;
     WATCH(slotTime);
-    WATCH(isSlotted);
 
     endTxEvent = new cMessage("send/endTx");
     state = IDLE;
@@ -65,9 +62,9 @@ void Host::initialize()
 
     channelBusy = 0;
     backoffTime = 0;
-    maxBackoffs = 16;
+    maxBackoffs = par("maxBackoffs");
     backoffCount = 0;
-    backoffTimer = new cMessage("backoff");
+    backoff = new cMessage("backoff");
     
     channelStateSignal = registerSignal("channelState");
     server->subscribe("channelState", this);
@@ -93,52 +90,50 @@ void Host::initialize()
         }
     }
 
-    scheduleAt(getNextTransmissionTime(), endTxEvent);
+    DIFSEvent = new cMessage("DIFSEvent");
+    DIFS = par("DIFS");
+    DIFS_FLAG = 0;
+
+    scheduleAt(getNextTransmissionTime(), DIFSEvent);
 }
 
 void Host::handleMessage(cMessage *msg)
 {
-    //  ASSERT(msg == endTxEvent || msg == backoffTimer || endListen);
+    //  ASSERT(msg == endTxEvent || msg == backoff || endListen);
 
     if (hasGUI() && msg == endTxEvent)
         getParentModule()->getCanvas()->setAnimationSpeed(transmissionEdgeAnimationSpeed, this);
 
-    if (msg == backoffTimer) {
+    if (msg == DIFSEvent) {
         if (channelBusy == 0) {
-            sendPacket(pk);
+            if (state == IDLE) {
+                // while channel is free and state is idle, wait for DIFS
+                scheduleAt(simTime() + DIFS, endTxEvent);
+                state = BEFORESNED;
+            } else if (state == FREEZE) {
+                // maybe this part is not needed, its implementation is below
+                scheduleAt(simTime() + DIFS + backoffTime, endTxEvent);
+                DIFS_FLAG = simTime();
+            }
         } else {
-            EV << "backoff packet " << pkname << endl;
-            state = BACKOFF;
-            emit(stateSignal, state);
-            backoffCount++;
-            backoffTime = pow(2, backoffCount) * unit_backoffTime;
-            scheduleAt(simTime() + backoffTime, backoffTimer);
+            scheduleAt(simTime(), backoff);
         }
     } else if (msg == endTxEvent) {
-        if (state == IDLE) {
+        if (state == BEFORESNED || state == FREEZE) {
             // generate packet
             snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getIndex(), pkCounter++);
             EV << "generating packet " << pkname << endl;
             pk = new cPacket(pkname);
             pk->setBitLength(pkLenBits->intValue());
 
-            if (channelBusy == 0) {
-                sendPacket(pk);
-            } else {
-                EV << "backoff packet " << pkname << endl;
-                state = BACKOFF;
-                emit(stateSignal, state);
-                backoffCount++;
-                backoffTime = pow(2, backoffCount) * unit_backoffTime;
-                scheduleAt(simTime() + backoffTime, backoffTimer);
-            }
+            sendPacket(pk);
         } else if (state == TRANSMIT) {
             // endTxEvent indicates end of transmission
             state = IDLE;
             emit(stateSignal, state);
 
             // schedule next sending
-            scheduleAt(getNextTransmissionTime(), endTxEvent);
+            scheduleAt(getNextTransmissionTime(), DIFSEvent);
 
             // send to other hosts the finish signal
             for (int i = 0; i < numOtherHosts; i++) {
@@ -148,32 +143,44 @@ void Host::handleMessage(cMessage *msg)
         } else {
             throw cRuntimeError("invalid state");
         }
+    } else if (msg == backoff) {
+        // only compute backofftime
+        EV << "host " << getIndex() << " backoff\n";
+        state = FREEZE;
+        if (backoffCount < maxBackoffs) {
+            backoffCount += 1;
+        }
+        backoffTime = generateBackofftime();
     } else {
-//        const char *pkg = msg->getName();
-        if (strcmp(msg->getName(),endListenName) == 0) {
-            EV << "finish receive other host\n";
+        if (strcmp(msg->getName(), endListenName) == 0) {
+            // EV << "finish receive other host\n";
             channelBusy--;
             delete msg;
+
+            if (state == FREEZE && channelBusy == 0) {
+                // At begin, this part is schedule a DIFSEvent, then execute below code
+                // Now, this part is executed directly
+                scheduleAt(simTime() + DIFS + backoffTime, endTxEvent);
+                DIFS_FLAG = simTime();
+            }
         } else {
-//            cPacket *pkt = check_and_cast<cPacket *>(msg);
             cMessage *pkt = check_and_cast<cMessage *>(msg);
 
             ASSERT(pkt->isReceptionStart());
-            // simtime_t endReceptionTime = simTime() + pkt->getDuration();
 
-            // if (!channelBusy) {
-            //     // EV << "start receive other host\n";
-            //     channelBusy = true;
-            //     scheduleAt(endReceptionTime, endListen);
-            // } else {
-            //     // EV << "another frame arrived while listening!\n";
+            if (state == FREEZE) {
+                // contention period
+                EV << "host " << getIndex() << " content fail and freeze\n";
+                backoffTime = simTime() - DIFS_FLAG - DIFS;
+                cancelEvent(endTxEvent);
+            } else if (state == BEFORESNED) {
+                // channel becomes busy while waiting for DIFS
+                // backoff
+                EV << "host " << getIndex() << " backoff while waiting for DIFS\n";
+                scheduleAt(simTime(), backoff);
+                cancelEvent(endTxEvent);
+            }
 
-            //     if (endReceptionTime > endListen->getArrivalTime()) {
-            //         cancelEvent(endListen);
-            //         scheduleAt(endReceptionTime, endListen);
-            //     }
-            // }
-            // channelBusy = true;
             channelBusy++;
             delete pkt;
         }
@@ -181,15 +188,18 @@ void Host::handleMessage(cMessage *msg)
 
 }
 
+simtime_t Host::generateBackofftime()
+{
+    int CW = pow(2, 2 + backoffCount) - 1;
+    int slots = intrand(CW + 1);
+    return slots * slotTime;
+};
+
 simtime_t Host::getNextTransmissionTime()
 {
     simtime_t t = simTime() + iaTime->doubleValue();
 
-    if (!isSlotted)
-        return t;
-    else
-        // align time of next transmission to a slot boundary
-        return slotTime * ceil(t/slotTime);
+    return t;
 }
 
 void Host::sendPacket(cPacket *pk) {
@@ -204,19 +214,14 @@ void Host::sendPacket(cPacket *pk) {
         snprintf(broadcast, sizeof(broadcast), "from-%d, to-%d", getIndex(), otherHosts[i]->getIndex());
         // EV << "generating packet " << broadcast << endl;
 
-//        cPacket *broadcastPacket = new cPacket(broadcast);
         cMessage *broadcastPacket = new cMessage(broadcast);
-//        broadcastPacket->setBitLength(pkLenBits->intValue());
 
-//        sendDirect(broadcastPacket, otherHostDelay[i], \
-//                    broadcastPacket->getBitLength() / txRate, otherHostGate[i]);
         sendDirect(broadcastPacket, otherHostDelay[i], \
                     0, otherHostGate[i]);
     }
 
     scheduleAt(simTime()+duration, endTxEvent);
     
-    backoffCount = 0;
     backoffTime = 0;
 
     // let visualization code know about the new packet
