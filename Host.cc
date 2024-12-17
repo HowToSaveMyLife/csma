@@ -93,8 +93,6 @@ void Host::initialize()
         }
     }
 
-    endListen = new cMessage("endListen");
-
     scheduleAt(getNextTransmissionTime(), endTxEvent);
 }
 
@@ -102,7 +100,7 @@ void Host::handleMessage(cMessage *msg)
 {
     //  ASSERT(msg == endTxEvent || msg == backoffTimer || endListen);
 
-    if (hasGUI())
+    if (hasGUI() && msg == endTxEvent)
         getParentModule()->getCanvas()->setAnimationSpeed(transmissionEdgeAnimationSpeed, this);
 
     if (msg == backoffTimer) {
@@ -144,36 +142,43 @@ void Host::handleMessage(cMessage *msg)
 
             // send to other hosts the finish signal
             for (int i = 0; i < numOtherHosts; i++) {
+                endListen = new cMessage("endListen");
                 sendDirect(endListen, otherHostDelay[i], 0, otherHostGate[i]);
             }
         } else {
             throw cRuntimeError("invalid state");
         }
-    } else if (msg == endListen) {
-        EV << "finish receive other host\n";
-        channelBusy--;
     } else {
-        cPacket *pkt = check_and_cast<cPacket *>(msg);
+//        const char *pkg = msg->getName();
+        if (strcmp(msg->getName(),endListenName) == 0) {
+            EV << "finish receive other host\n";
+            channelBusy--;
+            delete msg;
+        } else {
+//            cPacket *pkt = check_and_cast<cPacket *>(msg);
+            cMessage *pkt = check_and_cast<cMessage *>(msg);
 
-        ASSERT(pkt->isReceptionStart());
-        // simtime_t endReceptionTime = simTime() + pkt->getDuration();
+            ASSERT(pkt->isReceptionStart());
+            // simtime_t endReceptionTime = simTime() + pkt->getDuration();
 
-        // if (!channelBusy) {
-        //     // EV << "start receive other host\n";
-        //     channelBusy = true;
-        //     scheduleAt(endReceptionTime, endListen);
-        // } else {
-        //     // EV << "another frame arrived while listening!\n";
+            // if (!channelBusy) {
+            //     // EV << "start receive other host\n";
+            //     channelBusy = true;
+            //     scheduleAt(endReceptionTime, endListen);
+            // } else {
+            //     // EV << "another frame arrived while listening!\n";
 
-        //     if (endReceptionTime > endListen->getArrivalTime()) {
-        //         cancelEvent(endListen);
-        //         scheduleAt(endReceptionTime, endListen);
-        //     }
-        // }
-        // channelBusy = true;
-        channelBusy++;
-        delete pkt;
+            //     if (endReceptionTime > endListen->getArrivalTime()) {
+            //         cancelEvent(endListen);
+            //         scheduleAt(endReceptionTime, endListen);
+            //     }
+            // }
+            // channelBusy = true;
+            channelBusy++;
+            delete pkt;
+        }
     }
+
 }
 
 simtime_t Host::getNextTransmissionTime()
@@ -199,11 +204,14 @@ void Host::sendPacket(cPacket *pk) {
         snprintf(broadcast, sizeof(broadcast), "from-%d, to-%d", getIndex(), otherHosts[i]->getIndex());
         // EV << "generating packet " << broadcast << endl;
 
-        cPacket *broadcastPacket = new cPacket(broadcast);
-        broadcastPacket->setBitLength(pkLenBits->intValue());
+//        cPacket *broadcastPacket = new cPacket(broadcast);
+        cMessage *broadcastPacket = new cMessage(broadcast);
+//        broadcastPacket->setBitLength(pkLenBits->intValue());
 
+//        sendDirect(broadcastPacket, otherHostDelay[i], \
+//                    broadcastPacket->getBitLength() / txRate, otherHostGate[i]);
         sendDirect(broadcastPacket, otherHostDelay[i], \
-                    broadcastPacket->getBitLength() / txRate, otherHostGate[i]);
+                    0, otherHostGate[i]);
     }
 
     scheduleAt(simTime()+duration, endTxEvent);

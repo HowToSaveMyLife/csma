@@ -75,6 +75,7 @@ class Host : public cSimpleModule, public cListener
     char broadcast[40];
     
     cMessage *endListen = nullptr;
+    char endListenName[10] = "endListen";
 
   public:
     virtual ~Host();
