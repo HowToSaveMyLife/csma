@@ -38,6 +38,22 @@ class Server : public cSimpleModule
     simsignal_t collisionLengthSignal;
     simsignal_t collisionSignal;
 
+    simtime_t SIFS;
+    simtime_t CTS_TIME;
+
+    char RTS[4] = "RTS";
+
+    const double propagationSpeed = 299792458.0;
+    double x, y;
+
+    int numHosts;
+    cModule **Hosts;
+    cGate **HostGate;
+    simtime_t *HostDelay;
+
+    cMessage *CTS;
+    bool CTS_flag;
+
   public:
     virtual ~Server();
 

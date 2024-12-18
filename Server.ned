@@ -22,6 +22,9 @@ simple Server
 
         double x @unit(m); // the x coordinate of the server
         double y @unit(m); // the y coordinate of the server
+        double CTS @unit(s);
+        double SIFS @unit(s);
+        int numHosts;
 
         double animationHoldTimeOnCollision @unit(s) = default(0s); // in animation time
 

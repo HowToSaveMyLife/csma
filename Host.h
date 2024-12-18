@@ -32,7 +32,7 @@ class Host : public cSimpleModule, public cListener
     // state variables, event pointers etc
     cModule *server;
     cMessage *endTxEvent = nullptr;
-    enum { IDLE = 0, TRANSMIT = 1, FREEZE = 2, BEFORESNED = 3} state;
+    enum { IDLE = 0, WAIT_CTS = 1, BEFORE_SNED = 2, TRANSMIT = 3, FREEZE = 4} state;
     simsignal_t stateSignal;
     simsignal_t channelStateSignal;
     int pkCounter;
@@ -67,6 +67,8 @@ class Host : public cSimpleModule, public cListener
     // simtime_t SIFS;
     simtime_t DIFS;
     simtime_t DIFS_FLAG;
+    simtime_t RTS_TIME;
+    simtime_t SIFS;
 
     cPacket *pk;
     char pkname[40];
@@ -80,6 +82,8 @@ class Host : public cSimpleModule, public cListener
     cMessage *endListen = nullptr;
     char endListenName[10] = "endListen";
 
+    cMessage *RTSEvent = nullptr;
+
   public:
     virtual ~Host();
 
@@ -89,6 +93,7 @@ class Host : public cSimpleModule, public cListener
     virtual void refreshDisplay() const override;
     simtime_t generateBackofftime();
     simtime_t getNextTransmissionTime();
+    void sendRTS();
     void sendPacket(cPacket *pk);
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, intval_t i, cObject *details) override;
 };

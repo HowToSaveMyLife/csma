@@ -19,15 +19,25 @@ network CSMA
         double txRate @unit(bps);  // transmission rate
         double slotTime @unit(ms);  // zero means no slots (pure Aloha)
         double DIFS @unit(ms);
+        double SIFS @unit(ms);
+        double RTS @unit(ms);
+        double CTS @unit(ms);
         int maxBackoffs;
         @display("bgi=background/terrain,s;bgb=1000,1000");
     submodules:
-        server: Server;
+        server: Server{
+            CTS = parent.CTS;
+            SIFS = parent.SIFS;
+            numHosts = parent.numHosts;
+        };
         host[numHosts]: Host {
             txRate = parent.txRate;
             slotTime = parent.slotTime;
             maxBackoffs = parent.maxBackoffs;
             DIFS = parent.DIFS;
+            SIFS = parent.SIFS;
+            RTS = parent.RTS;
         }
 }
+
 

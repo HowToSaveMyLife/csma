@@ -93,6 +93,10 @@ void Host::initialize()
     DIFSEvent = new cMessage("DIFSEvent");
     DIFS = par("DIFS");
     DIFS_FLAG = 0;
+    RTS_TIME = par("RTS");
+    SIFS = par("SIFS");
+
+    RTSEvent = new cMessage("RTSEvent");
 
     scheduleAt(getNextTransmissionTime(), DIFSEvent);
 }
@@ -108,18 +112,19 @@ void Host::handleMessage(cMessage *msg)
         if (channelBusy == 0) {
             if (state == IDLE) {
                 // while channel is free and state is idle, wait for DIFS
-                scheduleAt(simTime() + DIFS, endTxEvent);
-                state = BEFORESNED;
+                scheduleAt(simTime() + DIFS, RTSEvent);
             } else if (state == FREEZE) {
                 // maybe this part is not needed, its implementation is below
-                scheduleAt(simTime() + DIFS + backoffTime, endTxEvent);
+                scheduleAt(simTime() + DIFS + backoffTime, RTSEvent);
                 DIFS_FLAG = simTime();
             }
         } else {
             scheduleAt(simTime(), backoff);
         }
+    } else if (msg == RTSEvent){
+        sendRTS();
     } else if (msg == endTxEvent) {
-        if (state == BEFORESNED || state == FREEZE) {
+        if (state == BEFORE_SNED) {
             // generate packet
             snprintf(pkname, sizeof(pkname), "pk-%d-#%d", getIndex(), pkCounter++);
             EV << "generating packet " << pkname << endl;
@@ -160,20 +165,39 @@ void Host::handleMessage(cMessage *msg)
             if (state == FREEZE && channelBusy == 0) {
                 // At begin, this part is schedule a DIFSEvent, then execute below code
                 // Now, this part is executed directly
-                scheduleAt(simTime() + DIFS + backoffTime, endTxEvent);
+                scheduleAt(simTime() + DIFS + backoffTime, RTSEvent);
                 DIFS_FLAG = simTime();
             }
-        } else {
+        } else if (strcmp(msg->getName(), "CTS") == 0) {
+            if (state == WAIT_CTS) {
+                // confirm that the CTS is received
+                cPacket *pkt = check_and_cast<cPacket *>(msg);
+                state = BEFORE_SNED;
+                cancelEvent(backoff);
+                scheduleAt(simTime() + SIFS + pkt->getDuration(), endTxEvent);
+                delete pkt;
+            } else {
+                delete msg;
+            }
+        } else if (strcmp(msg->getName(), "RTS") == 0) {
+            if (state == FREEZE) {
+                // contention period
+                EV << "host " << getIndex() << " content fail and freeze\n";
+                // while RTS collision, don't receive CTS, then create a new backoffTime below
+                // then next other RTS arrive, backoffTime is not changed
+                if (backoffTime - (simTime() - DIFS_FLAG - DIFS) > 0) {
+                    backoffTime = backoffTime - (simTime() - DIFS_FLAG - DIFS);
+                }
+                cancelEvent(RTSEvent);
+            }
+            delete msg;
+        }
+        else {
             cMessage *pkt = check_and_cast<cMessage *>(msg);
 
             ASSERT(pkt->isReceptionStart());
 
-            if (state == FREEZE) {
-                // contention period
-                EV << "host " << getIndex() << " content fail and freeze\n";
-                backoffTime = simTime() - DIFS_FLAG - DIFS;
-                cancelEvent(endTxEvent);
-            } else if (state == BEFORESNED) {
+            if (state == WAIT_CTS) {
                 // channel becomes busy while waiting for DIFS
                 // backoff
                 EV << "host " << getIndex() << " backoff while waiting for DIFS\n";
@@ -192,6 +216,7 @@ simtime_t Host::generateBackofftime()
 {
     int CW = pow(2, 2 + backoffCount) - 1;
     int slots = intrand(CW + 1);
+    EV << "slots: " << slots << endl;
     return slots * slotTime;
 };
 
@@ -200,6 +225,20 @@ simtime_t Host::getNextTransmissionTime()
     simtime_t t = simTime() + iaTime->doubleValue();
 
     return t;
+}
+
+void Host::sendRTS(){
+    cPacket *RTS = new cPacket("RTS");
+    sendDirect(RTS, radioDelay, RTS_TIME, server->gate("in"));
+
+    for (int i = 0; i < numOtherHosts; i++) {
+        RTS = new cPacket("RTS");
+        sendDirect(RTS, otherHostDelay[i], RTS_TIME, otherHostGate[i]);
+    }
+
+    // if don't get CTS, backoff
+    scheduleAt(simTime() + RTS_TIME + SIFS * 5, backoff);
+    state = WAIT_CTS;
 }
 
 void Host::sendPacket(cPacket *pk) {

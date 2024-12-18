@@ -41,6 +41,32 @@ void Server::initialize()
 
     getDisplayString().setTagArg("p", 0, par("x").doubleValue());
     getDisplayString().setTagArg("p", 1, par("y").doubleValue());
+
+    SIFS = par("SIFS");
+    CTS_TIME = par("CTS");
+
+    CTS = new cPacket("CTS");
+
+    x = par("x").doubleValue();
+    y = par("y").doubleValue();
+
+    numHosts = par("numHosts");
+    Hosts = new cModule *[numHosts];
+    HostGate = new cGate *[numHosts];
+    HostDelay = new simtime_t[numHosts];
+    char hostname[10] = "host[x]";
+    for (int i = 0; i < numHosts; i++) {
+        snprintf(hostname, sizeof(hostname), "host[%d]", i);
+        Hosts[i] = getModuleByPath(hostname);
+        HostGate[i] = Hosts[i]->gate("in");
+
+        double dist = std::sqrt((x-Hosts[i]->par("x").doubleValue()) * \
+                    (x-Hosts[i]->par("x").doubleValue()) + \
+                    (y-Hosts[i]->par("y").doubleValue()) * \
+                    (y-Hosts[i]->par("y").doubleValue()));
+        HostDelay[i] = dist / propagationSpeed;
+    }
+    CTS_flag = false;
 }
 
 void Server::handleMessage(cMessage *msg)
@@ -70,6 +96,27 @@ void Server::handleMessage(cMessage *msg)
         currentCollisionNumFrames = 0;
         receiveCounter = 0;
         emit(receiveBeginSignal, receiveCounter);
+    } else if (strcmp(msg->getName(), RTS) == 0){
+        // TODO: if many hosts send RTS at the same time, the CTS will only be sent to last one
+        // method1: only send CTS to the last one
+        // method2: send CTS to all hosts, but carry the index of the host, and the host will check if the CTS is for itself
+        if (!CTS_flag) {
+            cPacket *pkt = check_and_cast<cPacket *>(msg);
+            simtime_t duration = pkt->getDuration();
+            scheduleAt(simTime() + duration + SIFS, CTS);
+            CTS_flag = true;
+            delete pkt;
+        } else {
+            cancelEvent(CTS);
+            CTS_flag = false;
+            delete msg;
+        }
+    } else if (msg == CTS) {
+        for (int i = 0; i < numHosts; i++) {
+            cPacket *CTS_send = new cPacket("CTS");
+            sendDirect(CTS_send, HostDelay[i], CTS_TIME, HostGate[i]);
+        }
+        CTS_flag = false;
     }
     else {
         cPacket *pkt = check_and_cast<cPacket *>(msg);

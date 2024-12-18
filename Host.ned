@@ -27,6 +27,8 @@ simple Host
         double midTransmissionAnimationSpeed; // used during transmission
         bool controlAnimationSpeed = default(true);
         double DIFS @unit(s);
+        double SIFS @unit(s);
+        double RTS @unit(s);
         int maxBackoffs;
         @display("i=device/pc_s");
     gates:
