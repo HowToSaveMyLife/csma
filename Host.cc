@@ -97,7 +97,9 @@ void Host::initialize()
     SIFS = par("SIFS");
 
     RTSEvent = new cMessage("RTSEvent");
+    cancleChannelBusy = new cMessage("cancleChannelBusy");
 
+    contentFailFlag = false;
     scheduleAt(getNextTransmissionTime(), DIFSEvent);
 }
 
@@ -159,7 +161,7 @@ void Host::handleMessage(cMessage *msg)
     } else {
         if (strcmp(msg->getName(), endListenName) == 0) {
             // EV << "finish receive other host\n";
-            channelBusy--;
+            channelBusy = 0;
             delete msg;
 
             if (state == FREEZE && channelBusy == 0) {
@@ -168,7 +170,7 @@ void Host::handleMessage(cMessage *msg)
                 scheduleAt(simTime() + DIFS + backoffTime, RTSEvent);
                 DIFS_FLAG = simTime();
             }
-        } else if (strcmp(msg->getName(), "CTS") == 0) {
+        } else if (strcmp(msg->getName(), "CTS_up") == 0) {
             if (state == WAIT_CTS) {
                 // confirm that the CTS is received
                 cPacket *pkt = check_and_cast<cPacket *>(msg);
@@ -179,8 +181,19 @@ void Host::handleMessage(cMessage *msg)
             } else {
                 delete msg;
             }
+            contentFailFlag = false;
+        } else if (strcmp(msg->getName(), "CTS_down") == 0) {
+            if (state == WAIT_CTS) {
+                // backoff as scheduled
+                delete msg;
+            } else {
+                delete msg;
+            }
+            contentFailFlag = false;
+
+            cancelEvent(cancleChannelBusy);
         } else if (strcmp(msg->getName(), "RTS") == 0) {
-            if (state == FREEZE) {
+            if (state == FREEZE && !contentFailFlag) {
                 // contention period
                 EV << "host " << getIndex() << " content fail and freeze\n";
                 // while RTS collision, don't receive CTS, then create a new backoffTime below
@@ -189,8 +202,21 @@ void Host::handleMessage(cMessage *msg)
                     backoffTime = backoffTime - (simTime() - DIFS_FLAG - DIFS);
                 }
                 cancelEvent(RTSEvent);
+                contentFailFlag = true;
             }
+
+            channelBusy = 1;
+
+            if (cancleChannelBusy->isScheduled()) {
+                cancelEvent(cancleChannelBusy);
+                scheduleAt(simTime() + DIFS * 10, cancleChannelBusy);
+            } else {
+                scheduleAt(simTime() + DIFS * 10, cancleChannelBusy);
+            }
+
             delete msg;
+        } else if (msg == cancleChannelBusy) {
+            channelBusy = 0;
         }
         else {
             cMessage *pkt = check_and_cast<cMessage *>(msg);

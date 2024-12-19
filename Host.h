@@ -84,6 +84,10 @@ class Host : public cSimpleModule, public cListener
 
     cMessage *RTSEvent = nullptr;
 
+    bool contentFailFlag;
+
+    cMessage *cancleChannelBusy = nullptr;
+
   public:
     virtual ~Host();
 

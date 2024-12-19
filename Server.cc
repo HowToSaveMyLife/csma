@@ -46,6 +46,10 @@ void Server::initialize()
     CTS_TIME = par("CTS");
 
     CTS = new cPacket("CTS");
+    CTS_UNFREEZE = new cMessage("CTS_UNFREEZE");
+    
+    CTS_flag = false;
+    CTS_FREEZE_flag = false;
 
     x = par("x").doubleValue();
     y = par("y").doubleValue();
@@ -66,7 +70,6 @@ void Server::initialize()
                     (y-Hosts[i]->par("y").doubleValue()));
         HostDelay[i] = dist / propagationSpeed;
     }
-    CTS_flag = false;
 }
 
 void Server::handleMessage(cMessage *msg)
@@ -97,28 +100,49 @@ void Server::handleMessage(cMessage *msg)
         receiveCounter = 0;
         emit(receiveBeginSignal, receiveCounter);
     } else if (strcmp(msg->getName(), RTS) == 0){
-        // TODO: if many hosts send RTS at the same time, the CTS will only be sent to last one
+        // TODO: if many hosts send RTS at the same time, how to solve the collision?
         // method1: only send CTS to the last one
-        // method2: send CTS to all hosts, but carry the index of the host, and the host will check if the CTS is for itself
-        if (!CTS_flag) {
+        // method2: send CTS to all hosts, but carry the index of the last host, and the host will check if the CTS is for itself
+        // method3: send CTS to all hosts, but carry the index of the first host, and the host will check if the CTS is for itself
+        // method4: freeze CTS, after some time, recover CTS
+        // use method4
+        if (!CTS_flag && !CTS_FREEZE_flag) {
             cPacket *pkt = check_and_cast<cPacket *>(msg);
             simtime_t duration = pkt->getDuration();
             scheduleAt(simTime() + duration + SIFS, CTS);
+            CTS_direction = pkt->getSenderModule()->getIndex();
             CTS_flag = true;
             delete pkt;
-        } else {
+        } else if (CTS_flag && !CTS_FREEZE_flag) {
             cancelEvent(CTS);
-            CTS_flag = false;
+            scheduleAt(simTime() + SIFS, CTS_UNFREEZE);
+            CTS_FREEZE_flag = true;
+        } else {
+            cancelEvent(CTS_UNFREEZE);
+            scheduleAt(simTime() + SIFS, CTS_UNFREEZE);
+            // cancelEvent(CTS);
+            // cPacket *pkt = check_and_cast<cPacket *>(msg);
+            // simtime_t duration = pkt->getDuration();
+            // scheduleAt(simTime() + duration + SIFS, CTS);
+            // CTS_direction = pkt->getSenderModule()->getIndex();
+            // CTS_flag = true;
             delete msg;
         }
     } else if (msg == CTS) {
         for (int i = 0; i < numHosts; i++) {
-            cPacket *CTS_send = new cPacket("CTS");
-            sendDirect(CTS_send, HostDelay[i], CTS_TIME, HostGate[i]);
+            if (i == CTS_direction) {
+                cPacket *CTS_send = new cPacket("CTS_up");
+                sendDirect(CTS_send, HostDelay[i], CTS_TIME, HostGate[i]);
+            } else {
+                cPacket *CTS_send = new cPacket("CTS_down");
+                sendDirect(CTS_send, HostDelay[i], CTS_TIME, HostGate[i]);
+            }
         }
         CTS_flag = false;
-    }
-    else {
+    } else if (msg == CTS_UNFREEZE) {
+        CTS_FREEZE_flag = false;
+        CTS_flag = false;
+    } else {
         cPacket *pkt = check_and_cast<cPacket *>(msg);
 
         ASSERT(pkt->isReceptionStart());

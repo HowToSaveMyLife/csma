@@ -53,6 +53,9 @@ class Server : public cSimpleModule
 
     cMessage *CTS;
     bool CTS_flag;
+    int CTS_direction;
+    cMessage *CTS_UNFREEZE;
+    bool CTS_FREEZE_flag;
 
   public:
     virtual ~Server();
