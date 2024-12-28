@@ -11,6 +11,6 @@ in IEEE 802.11 (WiFi) networks. The model demonstrates how nodes:
 
 The supplied omnetpp.ini file contains 3 predefined configurations:
 
-- CSMA/CA at high load
-- CSMA/CA at moderate load (utilization =~ max)
+- CSMA/CA at high load (utilization =~ max)
+- CSMA/CA at moderate load
 - CSMA/CA at low load
